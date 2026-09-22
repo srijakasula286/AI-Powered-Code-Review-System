@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
 import type { ScanResult } from "@/lib/types";
@@ -248,7 +248,7 @@ function getReviewSummary(scan: ScanResult) {
   };
 }
 
-export default function ScanReport() {
+function ScanReportContent() {
   const searchParams = useSearchParams();
   const scanId = searchParams.get("scanId");
 
@@ -877,5 +877,34 @@ export default function ScanReport() {
         AI-Based Repo Review System
       </footer>
     </main>
+  );
+}
+
+function ScanLoadingFallback() {
+  return (
+    <main className="min-h-screen bg-[#09090b] text-white">
+      <Navbar />
+
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-[-300px] h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-violet-600/10 blur-[120px]" />
+        <div className="absolute bottom-[-250px] right-[-150px] h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px]" />
+      </div>
+
+      <section className="relative z-10 mx-auto flex min-h-[75vh] max-w-3xl flex-col items-center justify-center px-6 text-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-violet-400" />
+        <h2 className="mt-6 text-2xl font-bold">Loading scan details...</h2>
+        <p className="mt-2 max-w-md text-sm leading-6 text-zinc-500">
+          Retrieving repository scan data and analysis findings.
+        </p>
+      </section>
+    </main>
+  );
+}
+
+export default function ScanPage() {
+  return (
+    <Suspense fallback={<ScanLoadingFallback />}>
+      <ScanReportContent />
+    </Suspense>
   );
 }

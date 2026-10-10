@@ -113,22 +113,23 @@ export async function POST(req: Request) {
         }),
       }
     );
-if (!webhookResponse.ok) {
-  const errorText = await webhookResponse.text();
 
-  console.error(
-    "GitHub webhook creation failed:",
-    webhookResponse.status,
-    errorText
-  );
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
 
-  return NextResponse.json(
-    {
-      error: `GitHub rejected the webhook (${webhookResponse.status}): ${errorText}`,
-    },
-    { status: webhookResponse.status }
-  );
-}
+      console.error(
+        "GitHub webhook creation failed:",
+        webhookResponse.status,
+        errorText
+      );
+
+      return NextResponse.json(
+        {
+          error: `GitHub rejected the webhook (${webhookResponse.status}): ${errorText}`,
+        },
+        { status: webhookResponse.status }
+      );
+    }
 
     const webhook = await webhookResponse.json();
 
@@ -162,6 +163,7 @@ if (!webhookResponse.ok) {
     );
   }
 }
+
 export async function GET() {
   const session = await auth();
 
@@ -175,7 +177,9 @@ export async function GET() {
   try {
     await connectDb();
 
-    const repository = await Repo.findOne().sort({ connectedAt: -1 }).lean();
+    const repository = await Repo.findOne()
+      .sort({ connectedAt: -1 })
+      .lean();
 
     return NextResponse.json({
       repository,
@@ -185,6 +189,69 @@ export async function GET() {
 
     return NextResponse.json(
       { error: "Failed to load connected repository" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: Request) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "Not authenticated" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await req.json();
+
+    const ownerAndRepo = body.ownerAndRepo?.trim();
+    const settings = body.settings;
+
+    if (!ownerAndRepo || !settings) {
+      return NextResponse.json(
+        { error: "Repository and settings are required" },
+        { status: 400 }
+      );
+    }
+
+    await connectDb();
+
+    const updatedRepo = await Repo.findOneAndUpdate(
+      { ownerAndRepo },
+      {
+        $set: {
+          settings: {
+            skipArchitecture: Boolean(settings.skipArchitecture),
+            skipSecurity: Boolean(settings.skipSecurity),
+            minSeverity: settings.minSeverity,
+          },
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!updatedRepo) {
+      return NextResponse.json(
+        { error: "Connected repository not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Settings saved successfully",
+      repository: updatedRepo,
+    });
+  } catch (error) {
+    console.error("Update repository settings error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to save settings" },
       { status: 500 }
     );
   }
